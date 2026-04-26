@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SafeScience 老師行動遙控器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: "微軟正黑體", sans-serif; background-color: #F1F5F9; touch-action: manipulation; }
+        /* 隱藏捲軸但可捲動 */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+        .group-btn { transition: all 0.1s ease-in-out; }
+        .group-btn.active { background-color: #3B82F6; color: white; border-color: #2563EB; transform: scale(1.05); box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.5); }
+        .action-btn:active { transform: scale(0.95); }
+        
+        /* 手機 APP 質感容器 */
+        .app-container { max-width: 480px; margin: 0 auto; min-height: 100vh; background-color: #F8FAFC; box-shadow: 0 0 20px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+    </style>
+</head>
+<body>
+
+    <div class="app-container relative">
+        <!-- 頂部導覽列 -->
+        <div class="bg-slate-800 text-white p-4 shadow-md sticky top-0 z-10 flex justify-between items-center">
+            <div>
+                <h1 class="font-bold text-lg leading-tight">SafeScience</h1>
+                <p class="text-slate-300 text-xs">行動評分面板</p>
+            </div>
+            <div id="connectionStatus" class="flex items-center gap-2 text-xs font-bold bg-slate-700 px-3 py-1.5 rounded-full">
+                <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> 已連線
+            </div>
+        </div>
+
+        <div class="flex-grow p-4 overflow-y-auto flex flex-col gap-6">
+
+            <!-- MVP 即時看板 -->
+            <div id="mvpBanner" class="bg-gradient-to-r from-yellow-100 to-yellow-50 border border-yellow-200 rounded-2xl p-3 flex items-center justify-between shadow-sm">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">👑</span>
+                    <span class="font-bold text-yellow-700 text-sm">目前安全模範</span>
+                </div>
+                <div id="mvpDisplay" class="font-black text-yellow-600 text-lg">
+                    第一組 (100 分)
+                </div>
+            </div>
+            
+            <!-- 1. 選擇組別 (大按鈕) -->
+            <section>
+                <h2 class="text-sm font-bold text-slate-500 mb-3 flex justify-between items-end">
+                    <span>📍 目前操作組別</span>
+                    <span id="currentScoreDisplay" class="text-lg text-blue-600 font-black">100 分</span>
+                </h2>
+                <div class="grid grid-cols-3 gap-3" id="groupGrid">
+                    <!-- JS 動態生成按鈕 -->
+                </div>
+            </section>
+
+            <!-- 2. 違規扣分區 -->
+            <section class="bg-white p-4 rounded-2xl shadow-sm border border-red-100">
+                <h2 class="text-sm font-bold text-red-500 mb-3">🤖 手動違規裁定 (扣分)</h2>
+                <div class="flex flex-col gap-3">
+                    <button onclick="sendAction('👓 未戴護目鏡', -5)" class="action-btn flex justify-between items-center p-4 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl border border-red-200 font-bold">
+                        <span class="text-lg">👓 未戴護目鏡</span>
+                        <span class="bg-red-500 text-white px-3 py-1 rounded-lg">- 5</span>
+                    </button>
+                    <button onclick="sendAction('🍔 飲食行為', -5)" class="action-btn flex justify-between items-center p-4 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-xl border border-orange-200 font-bold">
+                        <span class="text-lg">🍔 飲食行為</span>
+                        <span class="bg-orange-500 text-white px-3 py-1 rounded-lg">- 5</span>
+                    </button>
+                    <button onclick="sendAction('🏃 嬉戲打鬧', -5)" class="action-btn flex justify-between items-center p-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-300 font-bold">
+                        <span class="text-lg">🏃 嬉戲打鬧</span>
+                        <span class="bg-slate-500 text-white px-3 py-1 rounded-lg">- 5</span>
+                    </button>
+                    <button onclick="sendAction('💤 聊天/不專心', -5)" class="action-btn flex justify-between items-center p-4 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl border border-purple-200 font-bold">
+                        <span class="text-lg">💤 聊天/不專心</span>
+                        <span class="bg-purple-500 text-white px-3 py-1 rounded-lg">- 5</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 3. 專業加分區 -->
+            <section class="bg-white p-4 rounded-2xl shadow-sm border border-green-100">
+                <h2 class="text-sm font-bold text-green-600 mb-3">🌟 專業表現 (加分)</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="sendAction('🌱 主動整潔', 5)" class="action-btn flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl border border-green-200 font-bold gap-2">
+                        <span class="text-2xl">🌱</span>
+                        <span>主動整潔</span>
+                        <span class="bg-green-500 text-white text-xs px-2 py-0.5 rounded-md">+ 5</span>
+                    </button>
+                    <button onclick="sendAction('🤝 團隊合作', 5)" class="action-btn flex flex-col items-center justify-center p-4 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl border border-blue-200 font-bold gap-2">
+                        <span class="text-2xl">🤝</span>
+                        <span>團隊合作</span>
+                        <span class="bg-blue-500 text-white text-xs px-2 py-0.5 rounded-md">+ 5</span>
+                    </button>
+                    <button onclick="sendAction('🔍 認真觀察', 5)" class="action-btn flex flex-col items-center justify-center p-4 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 rounded-xl border border-yellow-200 font-bold gap-2 col-span-2">
+                        <span class="text-2xl">🔍</span>
+                        <span>認真觀察</span>
+                        <span class="bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-md">+ 5</span>
+                    </button>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- 視覺回饋提示 (Toast) -->
+    <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full font-bold shadow-xl opacity-0 pointer-events-none transition-opacity duration-300 z-50 whitespace-nowrap">
+        發送成功
+    </div>
+
+    <script>
+        const groupNames = ["第一組", "第二組", "第三組", "第四組", "第五組", "第六組"];
+        // 為了讓遙控器也能看到初步分數，這裡建立一個本地的備份狀態
+        let localScores = [100, 100, 100, 100, 100, 100];
+        let selectedGroup = 0;
+
+        // 建立廣播頻道與主畫面連線 (限同一瀏覽器)
+        const syncChannel = new BroadcastChannel('safescience_sync');
+
+        // 監聽來自大螢幕(主程式)的分數更新同步
+        syncChannel.onmessage = (event) => {
+            if (event.data.type === 'SYNC_SCORES') {
+                localScores = event.data.scores;
+                updateScoreDisplay();
+            }
+        };
+
+        function initUI() {
+            const grid = document.getElementById('groupGrid');
+            groupNames.forEach((name, i) => {
+                const btn = document.createElement('button');
+                btn.className = `group-btn h-16 rounded-2xl border-2 border-slate-200 font-black text-lg bg-white text-slate-600 shadow-sm flex flex-col items-center justify-center gap-1 ${i === 0 ? 'active' : ''}`;
+                btn.innerHTML = `<span>${i + 1}</span><span class="text-[10px] font-normal opacity-80">第${i+1}組</span>`;
+                btn.onclick = () => selectGroup(i);
+                grid.appendChild(btn);
+            });
+            updateScoreDisplay();
+        }
+
+        function selectGroup(index) {
+            selectedGroup = index;
+            document.querySelectorAll('.group-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', i === index);
+            });
+            updateScoreDisplay();
+            
+            // 讓手機震動提供觸覺回饋 (Android 支援)
+            if (navigator.vibrate) navigator.vibrate(50);
+        }
+
+        function updateScoreDisplay() {
+            document.getElementById('currentScoreDisplay').innerText = `${localScores[selectedGroup]} 分`;
+            updateMVP();
+        }
+
+        // 計算並更新 MVP 顯示
+        function updateMVP() {
+            const maxVal = Math.max(...localScores);
+            const maxIdx = localScores.indexOf(maxVal);
+            document.getElementById('mvpDisplay').innerText = `${groupNames[maxIdx]} (${maxVal} 分)`;
+        }
+
+        function sendAction(reason, points) {
+            // 1. 本地更新預覽
+            localScores[selectedGroup] += points;
+            updateScoreDisplay();
+
+            // 2. 透過頻道發送指令給大螢幕主程式
+            syncChannel.postMessage({
+                type: 'ACTION',
+                groupIndex: selectedGroup,
+                reason: reason,
+                points: points
+            });
+
+            // 3. 視覺與觸覺回饋
+            showToast(`${groupNames[selectedGroup]} ${points > 0 ? '+' : ''}${points} (${reason})`);
+            if (navigator.vibrate) {
+                navigator.vibrate(points > 0 ? [30, 50, 30] : [100]);
+            }
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            
+            // 根據加減分改變 Toast 顏色
+            if (message.includes('+')) {
+                toast.className = "fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full font-bold shadow-xl transition-opacity duration-300 z-50 whitespace-nowrap";
+            } else {
+                toast.className = "fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-full font-bold shadow-xl transition-opacity duration-300 z-50 whitespace-nowrap";
+            }
+
+            toast.style.opacity = '1';
+            setTimeout(() => { toast.style.opacity = '0'; }, 1500);
+        }
+
+        // 啟動遙控器時，跟主畫面要一次最新分數
+        setTimeout(() => {
+            syncChannel.postMessage({ type: 'REQUEST_SCORES' });
+        }, 500);
+
+        initUI();
+    </script>
+</body>
+</html>

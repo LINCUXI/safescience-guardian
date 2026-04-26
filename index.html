@@ -1,0 +1,341 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeScience 守護者 - 主畫面 (AI行為分析版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/tracking-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/data/face-min.js"></script>
+    <style>
+        body { font-family: "微軟正黑體", sans-serif; background-color: #F8F9FA; }
+        .group-btn { transition: all 0.2s; }
+        .group-btn.active { background-color: #409EFF; color: white; border-color: #409EFF; }
+        .camera-container { position: relative; width: 100%; height: 100%; min-height: 500px; background-color: #000; border-radius: 15px; border: 4px solid #409EFF; overflow: hidden; }
+        video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        .panel-box { background-color: white; border: 2px solid #DCDFE6; border-radius: 10px; padding: 15px; margin-bottom: 10px; }
+        .panel-title { font-weight: bold; margin-bottom: 10px; color: #303133; }
+        .teacher-frame { width: 180px; height: 200px; border: 2px dashed #DCDFE6; border-radius: 5px; background-color: #EBEEF5; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; position: relative; margin: 0 auto; }
+        .teacher-frame img { width: 100%; height: 100%; object-fit: cover; display: none; }
+        .teacher-frame:hover { border-color: #409EFF; }
+        .teacher-placeholder { text-align: center; color: #909399; line-height: 1.5; pointer-events: none; }
+        
+        /* 螢幕周圍紅色閃爍警告特效 */
+        @keyframes alert-pulse {
+            0% { box-shadow: inset 0 0 0px rgba(245, 108, 108, 0); }
+            50% { box-shadow: inset 0 0 40px rgba(245, 108, 108, 0.8); }
+            100% { box-shadow: inset 0 0 0px rgba(245, 108, 108, 0); }
+        }
+        .camera-alert { animation: alert-pulse 1s infinite; border-color: #F56C6C !important; }
+    </style>
+</head>
+<body class="p-4 md:p-8 h-screen flex flex-col">
+
+    <div class="flex flex-col lg:flex-row gap-6 h-full">
+        <!-- 左側：影像區 -->
+        <div class="lg:w-2/3 flex flex-col gap-4 h-full">
+            <div id="cameraWrapper" class="camera-container flex-grow transition-colors duration-300">
+                <video id="videoElement" autoplay playsinline muted></video>
+                <canvas id="canvasElement"></canvas>
+                
+                <!-- 新增：AI 分析狀態面板 -->
+                <div class="absolute top-4 right-4 bg-black/60 text-white p-3 rounded-lg border border-gray-600 backdrop-blur-sm z-10 flex flex-col gap-2">
+                    <div class="text-sm font-bold flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> 行為軌跡分析模組：運作中
+                    </div>
+                    <div id="aiAlertBox" class="text-xs bg-red-500/20 text-red-300 px-2 py-1 rounded hidden border border-red-500/50">
+                        🚨 偵測到異常活動
+                    </div>
+                </div>
+
+                <!-- 初始啟動畫面 -->
+                <div id="startOverlay" class="absolute inset-0 flex items-center justify-center bg-black/80 z-20">
+                    <button id="startCamBtn" class="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold hover:bg-blue-600 transition text-xl shadow-lg shadow-blue-500/50 flex flex-col items-center">
+                        <span>啟動 AI 守護之眼</span>
+                        <span class="text-sm font-normal opacity-80 mt-1">(包含異常行為預判系統)</span>
+                    </button>
+                </div>
+            </div>
+            <div id="mvpDisplay" class="text-center font-bold text-3xl text-yellow-600 bg-white p-4 rounded-xl border-4 border-yellow-300 shadow-md flex justify-center items-center gap-3">
+                <span>👑</span>
+                <span>安全模範：第一組 (100 分)</span>
+                <span>👑</span>
+            </div>
+        </div>
+
+        <!-- 右側：控制面板 -->
+        <div class="lg:w-1/3 flex flex-col overflow-y-auto pr-2">
+            
+            <div class="panel-box text-center">
+                <div class="panel-title text-left flex justify-between">
+                    <span>👀 守護之眼 (主控台)</span>
+                    <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full animate-pulse">📡 遙控器連線中</span>
+                </div>
+                <input type="file" id="imageInput" accept="image/png, image/jpeg" class="hidden">
+                <div class="teacher-frame" onclick="document.getElementById('imageInput').click()">
+                    <div class="teacher-placeholder" id="teacherPlaceholder">📷<br>點此載入照片</div>
+                    <img id="teacherImage" alt="Teacher">
+                </div>
+            </div>
+
+            <div class="panel-box">
+                <div class="panel-title">🏆 安全積分榜</div>
+                <div class="grid grid-cols-2 gap-3 text-gray-700 font-bold text-lg" id="scoreBoard">
+                    <!-- JS 動態生成 -->
+                </div>
+            </div>
+
+            <div class="panel-box mt-auto">
+                <div class="panel-title flex justify-between items-center">
+                    <span>📍 備用操作面板</span>
+                    <button onclick="exportCSV()" class="text-sm bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 shadow-md">📥 匯出實驗紀錄 (CSV)</button>
+                </div>
+                <div class="flex justify-between mt-2" id="groupSelector">
+                    <!-- JS 動態生成 -->
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- 核心狀態設定 ---
+        const groupNames = ["第一組", "第二組", "第三組", "第四組", "第五組", "第六組"];
+        let groupScores = [100, 100, 100, 100, 100, 100];
+        let selectedGroup = 0;
+        let historyLog = [];
+
+        // --- AI 異常行為偵測變數 ---
+        let lastFaces = []; // 紀錄上一幀的人臉座標
+        const MOVEMENT_THRESHOLD = 30; // 敏感度：移動超過此像素視為「異常動作 (嬉戲)」
+        let abnormalTimeout = null;
+
+        // --- 廣播頻道連動設定 ---
+        const syncChannel = new BroadcastChannel('safescience_sync');
+        syncChannel.onmessage = (event) => {
+            const data = event.data;
+            if (data.type === 'ACTION') {
+                selectedGroup = data.groupIndex;
+                selectGroup(selectedGroup);
+                handleAction(data.reason, data.points);
+                syncChannel.postMessage({ type: 'SYNC_SCORES', scores: groupScores });
+            } else if (data.type === 'REQUEST_SCORES') {
+                syncChannel.postMessage({ type: 'SYNC_SCORES', scores: groupScores });
+            }
+        };
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playBeep(freq, durationMs) {
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start();
+            setTimeout(() => osc.stop(), durationMs);
+        }
+
+        function playPositiveSound() { playBeep(1000, 200); }
+        function playNegativeSound() {
+            playBeep(2000, 300);
+            setTimeout(() => playBeep(1500, 300), 350);
+        }
+
+        function initUI() {
+            const scoreBoard = document.getElementById('scoreBoard');
+            scoreBoard.innerHTML = '';
+            groupNames.forEach((name, i) => {
+                scoreBoard.innerHTML += `<div id="score-${i}" class="bg-gray-50 p-2 rounded border border-gray-200 text-center">${name}： <span class="text-blue-600">${groupScores[i]}</span> 分</div>`;
+            });
+
+            const groupSelector = document.getElementById('groupSelector');
+            groupSelector.innerHTML = '';
+            for (let i = 0; i < 6; i++) {
+                const btn = document.createElement('button');
+                btn.className = `group-btn w-10 h-10 rounded-full border-2 border-gray-300 font-bold bg-white text-gray-700 ${i === 0 ? 'active' : ''}`;
+                btn.innerText = i + 1;
+                btn.onclick = () => selectGroup(i);
+                groupSelector.appendChild(btn);
+            }
+        }
+
+        function selectGroup(index) {
+            selectedGroup = index;
+            document.querySelectorAll('.group-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', i === index);
+            });
+        }
+
+        function handleAction(reason, points) {
+            groupScores[selectedGroup] += points;
+            document.getElementById(`score-${selectedGroup}`).innerHTML = `${groupNames[selectedGroup]}： <span class="text-blue-600">${groupScores[selectedGroup]}</span> 分`;
+            
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+            historyLog.push([timeStr, groupNames[selectedGroup], reason, points]);
+
+            if (points > 0) playPositiveSound();
+            else playNegativeSound();
+
+            updateMVP();
+        }
+
+        function updateMVP() {
+            const maxVal = Math.max(...groupScores);
+            const maxIdx = groupScores.indexOf(maxVal);
+            document.getElementById('mvpDisplay').innerHTML = `<span>👑</span><span>安全模範：${groupNames[maxIdx]} (${maxVal} 分)</span><span>👑</span>`;
+        }
+
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const imgEl = document.getElementById('teacherImage');
+                    imgEl.src = event.target.result;
+                    imgEl.style.display = 'block';
+                    document.getElementById('teacherPlaceholder').style.display = 'none';
+                    document.querySelector('.teacher-frame').style.borderStyle = 'solid';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // --- 核心：相機與 AI 行為分析引擎 ---
+        document.getElementById('startCamBtn').addEventListener('click', async () => {
+            initAudio(); 
+            document.getElementById('startOverlay').style.display = 'none';
+            const video = document.getElementById('videoElement');
+            const canvas = document.getElementById('canvasElement');
+            const context = canvas.getContext('2d');
+            const wrapper = document.getElementById('cameraWrapper');
+            const aiAlertBox = document.getElementById('aiAlertBox');
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    const tracker = new tracking.ObjectTracker('face');
+                    tracker.setInitialScale(4);
+                    tracker.setStepSize(2);
+                    tracker.setEdgesDensity(0.1);
+
+                    tracking.track('#videoElement', tracker);
+
+                    tracker.on('track', event => {
+                        context.clearRect(0, 0, canvas.width, canvas.height);
+                        
+                        // 畫面上方的基礎掃描字樣
+                        context.fillStyle = '#10B981';
+                        context.font = '24px "微軟正黑體", sans-serif';
+                        context.fontWeight = 'bold';
+                        context.fillText("🛡️ 安全掃描中...", 30, 40);
+
+                        let hasAbnormalBehavior = false;
+                        const currentFaces = event.data;
+
+                        currentFaces.forEach(rect => {
+                            let isAbnormal = false;
+                            
+                            // 尋找上一幀中最接近這張臉的位置
+                            const matchedFace = lastFaces.find(lf => Math.abs(lf.x - rect.x) < 80 && Math.abs(lf.y - rect.y) < 80);
+                            
+                            // 如果找到同一個人，計算它的「移動距離 (速度)」
+                            if (matchedFace) {
+                                const distance = Math.sqrt(Math.pow(rect.x - matchedFace.x, 2) + Math.pow(rect.y - matchedFace.y, 2));
+                                // 如果瞬間移動超過設定值，判定為大動作/嬉戲
+                                if (distance > MOVEMENT_THRESHOLD) {
+                                    isAbnormal = true;
+                                    hasAbnormalBehavior = true;
+                                }
+                            }
+
+                            // 因為 CSS 做了鏡像反轉，Canvas 的 X 座標也要反轉對齊
+                            const flippedX = canvas.width - rect.x - rect.width;
+                            
+                            if (isAbnormal) {
+                                // 🚨 異常狀態：畫紅色粗框
+                                context.strokeStyle = '#F56C6C'; 
+                                context.lineWidth = 5;
+                                context.strokeRect(flippedX, rect.y, rect.width, rect.height);
+                                
+                                // 畫紅色警告標籤
+                                context.fillStyle = 'rgba(245, 108, 108, 0.8)';
+                                context.fillRect(flippedX, rect.y - 30, 110, 25);
+                                context.fillStyle = '#FFFFFF';
+                                context.font = '14px "微軟正黑體"';
+                                context.fillText("⚠️ 疑似嬉戲", flippedX + 5, rect.y - 12);
+                            } else {
+                                // ✅ 正常狀態：畫綠色細框
+                                context.strokeStyle = '#67C23A';
+                                context.lineWidth = 3;
+                                context.strokeRect(flippedX, rect.y, rect.width, rect.height);
+                            }
+                        });
+
+                        // 更新歷史人臉資料給下一幀比對
+                        lastFaces = currentFaces;
+
+                        // 控制全域的紅色警告特效
+                        if (hasAbnormalBehavior) {
+                            wrapper.classList.add('camera-alert');
+                            aiAlertBox.classList.remove('hidden');
+                            
+                            // 重置清除警告的倒數計時器
+                            clearTimeout(abnormalTimeout);
+                            abnormalTimeout = setTimeout(() => {
+                                wrapper.classList.remove('camera-alert');
+                                aiAlertBox.classList.add('hidden');
+                            }, 1000); // 維持警告狀態一秒鐘方便老師看見
+                        }
+                    });
+                };
+            } catch (err) {
+                console.error("無法存取相機", err);
+                alert("無法存取攝影機。請確定您已允許瀏覽器存取攝影機權限！");
+            }
+        });
+
+        function exportCSV() {
+            if (historyLog.length === 0) {
+                alert("目前沒有任何紀錄！");
+                return;
+            }
+            
+            let csvContent = "\uFEFF時間,組別,事件,增減分\n";
+            historyLog.forEach(row => {
+                csvContent += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const now = new Date();
+            const dateStr = `${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}`;
+            
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `實驗紀錄_${dateStr}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        initUI();
+    </script>
+</body>
+</html>
